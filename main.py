@@ -15,7 +15,7 @@ import math
 
 def haversine(coord1: tuple, coord2: tuple) -> float:
     """ Вычисление расстояния между двумя координатами
-    Принимает на вход 2 кортежа, состоящих из координат в градусах
+    Принимает на вход 2 кортежа, состоящих из координат в десятичных градусах
     :param coord1: первая координата; кортеж (широта, долгота) в десятичных градусах
     :param coord2: вторая координата; кортеж (широта, долгота) в десятичных градусах
     :return: расстояние между двумя координатами в километрах в формате float
@@ -39,8 +39,42 @@ def assign_orders(order_list: list, couriers_list: list) -> dict:
     :return: назначенные заказы в формате dict
     """
     assignments = {}
-    for o in order_list:
-        order_location = o['from']
-        courier = min(couriers_list, key=lambda x: haversine(x['location'], order_location))
-        assignments[courier['id']] = o
+    while order_list:
+        min_total_distance = float('inf')
+        selected_courier = None
+        selected_order = None
+        for courier in couriers_list:
+            if not order_list:
+                break
+            order = min(order_list,
+                        key=lambda x: haversine(courier['location'], x['from']) + haversine(x['from'], x['to']))
+            total_distance = haversine(courier['location'], order['from']) + haversine(order['from'], order['to'])
+            if total_distance < min_total_distance:
+                min_total_distance = total_distance
+                selected_courier = courier
+                selected_order = order
+        if selected_courier:
+            assignments[selected_courier['location']] = selected_order
+            order_list.remove(selected_order)
     return assignments
+
+
+if __name__ == '__main__':
+    # Пример входных данных
+    orders = [
+        {'from': (1, 2), 'to': (5, 5), 'cost': 50},
+        {'from': (2, 3), 'to': (6, 4), 'cost': 70},
+        {'from': (3, 4), 'to': (8, 9), 'cost': 60},
+    ]
+
+    couriers = [
+        {'location': (2, 3)},
+        {'location': (6, 7)},
+        {'location': (4, 5)},
+        {'location': (1, 2)},
+    ]
+
+    assigned_orders = assign_orders(orders, couriers)
+
+    for courier, order in assigned_orders.items():
+        print(f"Курьер {courier} доставит заказ {order}")
