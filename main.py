@@ -13,7 +13,7 @@
 import math
 
 
-def haversine(coord1: tuple, coord2: tuple) -> float:
+def calculate_distance(coord1: tuple, coord2: tuple) -> float:
     """ Вычисление расстояния между двумя координатами
     Принимает на вход 2 кортежа, состоящих из координат в десятичных градусах
     :param coord1: первая координата; кортеж (широта, долгота) в десятичных градусах
@@ -38,24 +38,44 @@ def assign_orders(order_list: list, couriers_list: list) -> dict:
     :param couriers_list: список курьеров
     :return: назначенные заказы в формате dict
     """
-    assignments = {}
+    assignments: dict = {}
+
+    # Назначаем каждому курьеру ближайший заказ
+    for courier in couriers_list:
+        min_distance = float('inf')
+        closest_order = None
+        for spare_order in order_list:
+            distance = calculate_distance(courier['location'], spare_order['from'])
+            if distance < min_distance:
+                min_distance = distance
+                closest_order = spare_order
+        if closest_order:
+            assignments[courier['id']] = [closest_order]
+            order_list.remove(closest_order)  # Удаляем заказ из списка, чтобы он не был назначен другому курьеру
+
+    # Добавляем дополнительные заказы для каждого курьера, если возможно
     while order_list:
-        min_total_distance = float('inf')
-        selected_courier = None
-        selected_order = None
-        for courier in couriers_list:
-            if not order_list:
-                break
-            order = min(order_list,
-                        key=lambda x: haversine(courier['location'], x['from']) + haversine(x['from'], x['to']))
-            total_distance = haversine(courier['location'], order['from']) + haversine(order['from'], order['to'])
-            if total_distance < min_total_distance:
-                min_total_distance = total_distance
-                selected_courier = courier
-                selected_order = order
-        if selected_courier:
-            assignments[selected_courier['location']] = selected_order
-            order_list.remove(selected_order)
+        for cour_id, assignment in assignments.items():
+            last_order = assignment[-1]  # Последний назначенный заказ
+            closest_order = None
+            min_distance = float('inf')
+            for spare_order in order_list:
+                # Проверяем расстояние от последней точки доставки курьера до точки получения заказа
+                distance = calculate_distance(last_order['to'], spare_order['from'])
+                if distance < min_distance:
+                    # Проверяем, что ни один другой курьер не ближе к точке А следующего заказа
+                    if all(calculate_distance(current_order[-1]['to'], spare_order['from']) >=
+                           distance for current_order in assignments.values()):
+                        min_distance = distance
+                    else:
+                        min_distance = min(calculate_distance(current_order[-1]['to'], spare_order['from'])
+                                           for current_order in assignments.values())
+                    closest_order = spare_order
+            if closest_order:
+                assignment.append(closest_order)  # Добавляем следующий заказ к текущему курьеру
+                order_list.remove(closest_order)  # Удаляем заказ из списка, чтобы он не был назначен другому курьеру
+            else:
+                break  # Если не нашли подходящий заказ для добавления, завершаем цикл
     return assignments
 
 
@@ -65,6 +85,8 @@ if __name__ == '__main__':
         {'from': (1, 2), 'to': (5, 5), 'cost': 50},
         {'from': (2, 3), 'to': (6, 4), 'cost': 70},
         {'from': (3, 4), 'to': (8, 9), 'cost': 60},
+        {'from': (5, 3), 'to': (2, 2), 'cost': 70},
+        {'from': (4, 4), 'to': (1, 9), 'cost': 60},
     ]
 
     couriers = [
@@ -73,8 +95,13 @@ if __name__ == '__main__':
         {'location': (4, 5)},
         {'location': (1, 2)},
     ]
+    # Для удобства работы назначим каждому курьеру идентификатор
+    couriers = [{'id': idx, **courier} for idx, courier in enumerate(couriers, start=1)]
 
     assigned_orders = assign_orders(orders, couriers)
 
-    for courier, order in assigned_orders.items():
-        print(f"Курьер {courier} доставит заказ {order}")
+    for courier_id, orders in assigned_orders.items():
+        print(f"Курьеру {courier_id} назначены заказы:")
+        for order in orders:
+            print(order)
+        print()

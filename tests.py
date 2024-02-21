@@ -23,6 +23,7 @@ couriers = [
     {'location': cur4_loc},
     {'location': cur5_loc},
 ]
+couriers = [{'id': idx, **courier} for idx, courier in enumerate(couriers, start=1)]
 
 
 class TestNearestCourier(unittest.TestCase):
